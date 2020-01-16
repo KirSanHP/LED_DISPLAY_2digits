@@ -1,89 +1,130 @@
-//Скетч должен выводить цифры, сменяемые по нажатию кнопки в порядке возрастания
+//Скетч должен выводить две цифры, сменяемые по нажатию кнопок в порядке возрастания
 //методом записи байта в порт D
 
-#define BLINK_TIME 300
+#define DOT_TIME 300
 
-// два младших бита поменяны местами из-за несоответствия нумерации битов порта и выходов платы (??)
-#define ZERO  B00111111
-#define ONE   B00000101
-#define TWO   B01011011
-#define THREE B01001111
-#define FOUR  B01100101
-#define FIVE  B01101110
-#define SIX   B01111110
-#define SEVEN B00000111
-#define EIGHT B01111111
-#define NINE  B01101111
-#define NONE  B00000000
+#define ZERO  B01000000
+#define ONE   B01111001
+#define TWO   B00100100
+#define THREE B00110000
+#define FOUR  B00011001
+#define FIVE  B00010010
+#define SIX   B00000010
+#define SEVEN B01111000
+#define EIGHT B00000000
+#define NINE  B00010000
+#define NONE  B11111111
 
-#define BTN_PIN 14 //A0
-//#define DOT_PIN 8
-#define ANOD 8
+#define ANODE1 8
+#define ANODE2 9
 
-bool btnPrev = 0;
-byte digit = 0;
+#define BTN1_PIN 14 //A0
+#define BTN2_PIN 15 //A1
+
+bool btn1Prev = 0;
+bool btn2Prev = 0;
+byte digit1 = 0;
+byte digit2 = 0;
+bool dot1 = 0;
+bool dot2 = 0;
 unsigned long millisPrev = 0;
+unsigned long switchTime = 0;
+unsigned long dotPrevTime = 0;
 
 void setup() {
-  DDRD = B11111111;           // == pinMode (0-7, OUTPUT);
-  PORTD = EIGHT;              // == digitOut (8);
+  pinMode (ANODE1, OUTPUT);
+  pinMode (ANODE2, OUTPUT);
+  digitalWrite (ANODE1, HIGH);
+  digitalWrite (ANODE2, HIGH);
+  DDRD = B11111111;
+  PORTD = EIGHT ^ (~dot1 << 7);
   delay (1000);
-  PORTD = NONE;               // выключить все сегменты
+  PORTD = NONE;
   delay (1000);
   millisPrev = millis();
-  pinMode (BTN_PIN, INPUT_PULLUP);
+  pinMode (BTN1_PIN, INPUT_PULLUP);
+  pinMode (BTN2_PIN, INPUT_PULLUP);
 //  pinMode (DOT_PIN, OUTPUT);
-  PORTD = ZERO;               // == digitOut (0);
+  digitalWrite (ANODE1, HIGH);
 }
 
-void loop() {
-  bool btn = !digitalRead (BTN_PIN);
-  if (btn == 1 && btnPrev == 0) {
-    delay (30);
-    digit++;
-    if (digit == 10)
-      digit = 0;
-    digitOut (digit);
+int main() {
+  bool btn1 = !digitalRead (BTN1_PIN);
+  bool btn2 = !digitalRead (BTN2_PIN);
+  if (btn1 == 1 && btn1Prev == 0) {
+    digit1++;
+    if (digit1 == 10) {
+      digit1 = 0;
+      digit2++;
+      if (digit2 == 10)
+        digit2 = 0;
+    }
   }
-  btnPrev = btn;
 
-  if (millis() >= millisPrev + BLINK_TIME) {
-    PORTD = PIND ^ (1 << 7);                  // инвертировать бит, отвечающий за точку и сразу отправить на выход
-    millisPrev += BLINK_TIME;
+  if (btn2 == 1 && btn2Prev == 0) {
+    digit1--;
+    if (digit1 == 255) {
+      digit1 = 9;
+      digit2--;
+      if (digit2 == 255)
+        digit2 = 9;
+    }
   }
+  btn1Prev = btn1;
+  btn2Prev = btn2;
+
+  if (millis() >= dotPrevTime + DOT_TIME) {
+    dot1 = !dot1;
+    dotPrevTime += DOT_TIME;
+  }
+
+  if (millis() >= switchTime + 5) {
+    if (digitalRead (ANODE1) ) {
+      digitalWrite (ANODE1, LOW);
+      digitalWrite (ANODE2, HIGH);
+      digitOut (digit2, dot2);
+    }
+    else {
+      digitalWrite (ANODE1, HIGH);
+      digitalWrite (ANODE2, LOW);
+      digitOut (digit1, dot1);
+    }
+    switchTime += 5;
+  }
+  return 0;
 }
 
-void digitOut (byte _digit) { 
+void digitOut (byte _digit, bool _dot) {
   switch (_digit) {
     case 0:
-      PORTD = (PIND & B10000000) | ZERO;
+      PORTD = ZERO ^ (~_dot << 7);
       break;
     case 1:
-      PORTD = (PIND & B10000000) | ONE;
+      PORTD = ONE ^ (~_dot << 7);
       break;
     case 2:
-      PORTD = (PIND & B10000000) | TWO;
+      PORTD = TWO ^ (~_dot << 7);
       break;
     case 3:
-      PORTD = (PIND & B10000000) | THREE;
+      PORTD = THREE ^ (~_dot << 7);
       break;
     case 4:
-      PORTD = (PIND & B10000000) | FOUR;
+      PORTD = FOUR ^ (~_dot << 7);
       break;
     case 5:
-      PORTD = (PIND & B10000000) | FIVE;
+      PORTD = FIVE ^ (~_dot << 7);
       break;
     case 6:
-      PORTD = (PIND & B10000000) | SIX;
+      PORTD = SIX ^ (~_dot << 7);
       break;
     case 7:
-      PORTD = (PIND & B10000000) | SEVEN;
+      PORTD = SEVEN ^ (~_dot << 7);
       break;
     case 8:
-      PORTD = (PIND & B10000000) | EIGHT;
+      PORTD = EIGHT ^ (~_dot << 7);
       break;
     case 9:
-      PORTD = (PIND & B10000000) | NINE;
+      PORTD = NINE ^ (~_dot << 7);
       break;
   }
 }
