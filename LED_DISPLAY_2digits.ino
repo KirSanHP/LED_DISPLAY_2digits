@@ -4,8 +4,8 @@
 // добавлено долгое нажатие с приращением или убавлением числа пока кнопка удерживается
 // если нажаты обе кнопки одновременно, устанавливаются нули
 
-//скетч работает нестабильно, как-то по настроению, сохранён ради интереса
-
+#include <LiquidCrystal_I2C.h>
+LiquidCrystal_I2C lcd (0x3f, 16, 2);
 
 #define DOT_TIME 300        //интервал мигания точки
 #define BTN_IGNORE_TIME 100 //время игнорирования кнопки на время дребезга
@@ -41,21 +41,22 @@ unsigned long dotPrevTime = 0;
 struct Num {
   byte digit2;
   byte digit1;
-  char change;
+  int change;
 };
 
 struct Btn {
   bool currentState;
   bool prevState;
   unsigned long prevTime;
-  unsigned long pressTime;
+//  unsigned long pressTime;
 };
 
-Btn btn1 = {0, 0, 0, 0};
-Btn btn2 = {0, 0, 0, 0};
-Num num = {3, 6, 0};
+Btn btn1 = {0, 0, 0};
+Btn btn2 = {0, 0, 0};
+Num num = {4, 6, 0};
 
 void setup() {
+  lcdStart();
   pinMode (ANODE1, OUTPUT);
   pinMode (ANODE2, OUTPUT);
   digitalWrite (ANODE1, HIGH);
@@ -72,24 +73,48 @@ void setup() {
 }
 
 void loop() {
-  btn1 = checkButton (BTN1_PIN, btn1);
-  btn2 = checkButton (BTN2_PIN, btn2);
+//  btn1 = checkButton (BTN1_PIN, btn1);
 
-  if (btn1.currentState && btn2.currentState && (!btn1.prevState || !btn2.prevState) ) {
-    num = {0, 0, 0};
-    btn1.prevState = btn1.currentState;
-    btn2.prevState = btn2.currentState;
+  bool btn1State = !digitalRead (BTN1_PIN);
+  unsigned long currentMillis1 = millis();
+  if ( btn1State && !btn1.prevState && ( currentMillis1 >= btn1.prevTime + BTN_IGNORE_TIME) )
+    btn1 =  {btn1State, btn1.prevState, currentMillis1};
+  else if (!btn1State && btn1.prevState && ( currentMillis1 >= btn1.prevTime + BTN_IGNORE_TIME) ) {
+    btn1 = {0, btn1.prevState, btn1.prevTime};
   }
+
+  
+//  btn2 = checkButton (BTN2_PIN, btn2);
+  
+  bool btn2State = !digitalRead (BTN2_PIN);
+  unsigned long currentMillis2 = millis();
+  if ( btn2State && !btn2.prevState && ( currentMillis2 >= btn2.prevTime + BTN_IGNORE_TIME) )
+    btn2 =  {btn2State, btn2.prevState, currentMillis2};
+  else if (!btn2State && btn2.prevState && ( currentMillis2 >= btn2.prevTime + BTN_IGNORE_TIME) ) {
+    btn2 = {0, btn2.prevState, btn2.prevTime};
+  }
+  
+/*
+  lcd.setCursor (4, 0);
+  lcd.print (btn1.currentState);
+  lcd.print (btn1.prevState);
+  lcd.setCursor (4, 1);
+  lcd.print (btn2.currentState);
+  lcd.print (btn2.prevState);
+*/
+  
+  if (btn1.currentState && btn2.currentState && (!btn1.prevState || !btn2.prevState) )
+    num = {0, 0, 0};
   else if (btn1.currentState && !btn1.prevState && !btn2.currentState) {
     num.change = 1;
-    num = numCalc (num);
-    btn1.prevState = btn1.currentState;
   }
   else if (btn2.currentState && !btn2.prevState && !btn1.currentState) {
     num.change = -1;
-    num = numCalc (num);
   }
-
+  num = numCalc (num);
+  
+  btn1.prevState = btn1.currentState;
+  btn2.prevState = btn2.currentState;
   if (millis() >= dotPrevTime + DOT_TIME) {
     dot1 = !dot1;
     dotPrevTime += DOT_TIME;
@@ -108,16 +133,15 @@ void loop() {
     }
     switchTime += 5;
   }
-delay (200);
 }
 
 Btn checkButton (byte _btnPin, Btn _btn) {
   bool _btnState = !digitalRead (_btnPin);
   unsigned long currentMillis = millis();
-  if ( _btnState && !_btn.prevState && ( currentMillis >= _btn.prevTime + BTN_IGNORE_TIME) )
-    return {1, _btn.prevState, currentMillis, 0};
-  else if (!_btnState && _btn.prevState && ( currentMillis >= _btn.prevTime + BTN_IGNORE_TIME) ) {
-    return {0, _btn.prevState, _btn.prevTime, (currentMillis - _btn.prevTime) };
+  if ( _btnState && _btn.prevState == 0 && ( currentMillis >= _btn.prevTime + BTN_IGNORE_TIME) )
+    return {1, _btn.prevState, currentMillis};
+  else if (_btnState == 0 && _btn.prevState && ( currentMillis >= _btn.prevTime + BTN_IGNORE_TIME) ) {
+    return {0, _btn.prevState, _btn.prevTime};
   }
 }
 
@@ -136,6 +160,10 @@ Num numCalc(Num _num) {
       _num.digit2 = 9;
   }
   _num.change = 0;
+  lcd.setCursor (0, 0);
+  lcd.print (num.digit2);
+  lcd.setCursor (0, 1);
+  lcd.print (num.digit1);
   return {_num.digit2, _num.digit1, _num.change};
 }
 
@@ -174,3 +202,8 @@ void digitOut (byte _digit, bool _dot) {
   }
 }
 
+void lcdStart() {
+  lcd.init();                     // инициализация LCD
+  lcd.backlight();                // включаем подсветку
+  lcd.clear();                    // очистка дисплея
+}
